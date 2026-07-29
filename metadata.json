@@ -1,0 +1,6 @@
+{
+  "name": "Isle Match",
+  "description": "2D Match-3 puzzle and island base-building adventure game.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
