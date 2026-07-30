@@ -34,6 +34,12 @@ class LevelController(
 
     init {
         setupBoardObstacles()
+        com.example.core.event.GameEventBus.postEvent(
+            com.example.core.event.GameEvent(
+                type = com.example.core.event.GameEventType.LEVEL_STARTED,
+                levelId = levelConfig.levelId
+            )
+        )
     }
 
     private fun setupBoardObstacles() {
@@ -51,12 +57,33 @@ class LevelController(
             onLevelVictory()
         } else if (moveCounter.movesRemaining <= 0) {
             gameState = LevelGameState.DEFEAT
+            onLevelDefeat()
+        }
+    }
+
+    private fun onLevelDefeat() {
+        if (hasProcessedCompletion) return
+        hasProcessedCompletion = true
+        com.example.core.event.GameEventBus.postEvent(
+            com.example.core.event.GameEvent(
+                type = com.example.core.event.GameEventType.LEVEL_FAILED,
+                levelId = levelConfig.levelId
+            )
+        )
+        scope.launch {
+            GameDataProvider.levelRepository.recordLoss(levelConfig.levelId)
         }
     }
 
     private fun onLevelVictory() {
         if (hasProcessedCompletion) return
         hasProcessedCompletion = true
+        com.example.core.event.GameEventBus.postEvent(
+            com.example.core.event.GameEvent(
+                type = com.example.core.event.GameEventType.LEVEL_COMPLETED,
+                levelId = levelConfig.levelId
+            )
+        )
 
         // Award remaining move bonus
         val unusedMoves = moveCounter.movesRemaining
@@ -93,6 +120,19 @@ class LevelController(
             if (isFirstCompletion) {
                 playerRepo.addCoins(finalCoinsEarned.toLong())
                 playerRepo.addXp(finalXpEarned.toLong())
+
+                // Grant island building materials based on level progression
+                val woodAmount = 15 + (levelConfig.levelId % 5) * 2
+                val stoneAmount = 10 + (levelConfig.levelId % 4) * 2
+                val metalAmount = if (levelConfig.levelId >= 10) 5 + (levelConfig.levelId % 3) * 2 else 0
+                val foodAmount = 10 + (levelConfig.levelId % 4) * 2
+
+                com.example.game.resource.ResourceManager.addResource(com.example.game.resource.ResourceType.WOOD, woodAmount, ignoreCapacity = true)
+                com.example.game.resource.ResourceManager.addResource(com.example.game.resource.ResourceType.STONE, stoneAmount, ignoreCapacity = true)
+                if (metalAmount > 0) {
+                    com.example.game.resource.ResourceManager.addResource(com.example.game.resource.ResourceType.METAL, metalAmount, ignoreCapacity = true)
+                }
+                com.example.game.resource.ResourceManager.addResource(com.example.game.resource.ResourceType.FOOD, foodAmount, ignoreCapacity = true)
             }
 
             val starDiff = finalStarsEarned - oldStars

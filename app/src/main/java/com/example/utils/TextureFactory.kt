@@ -166,6 +166,71 @@ object TextureFactory {
                     pixmap.fillRectangle(10, 21, size - 20, 5)
                     pixmap.fillRectangle(10, 30, size - 20, 5)
                 }
+                "hammer" -> {
+                    // Brown handle
+                    pixmap.setColor(0.6f, 0.35f, 0.15f, 1f)
+                    pixmap.fillRectangle(center - 3, 6, 6, size - 16)
+                    // Metallic head
+                    pixmap.setColor(0.75f, 0.8f, 0.85f, 1f)
+                    pixmap.fillRectangle(center - 14, size - 18, 28, 12)
+                    pixmap.setColor(0.45f, 0.5f, 0.55f, 1f)
+                    pixmap.drawRectangle(center - 14, size - 18, 28, 12)
+                }
+                "swap" -> {
+                    pixmap.setColor(0.2f, 0.75f, 0.95f, 1f)
+                    pixmap.fillCircle(center, center, center - 3)
+                    pixmap.setColor(1f, 1f, 1f, 1f)
+                    // Two arrows pointing opposite
+                    pixmap.fillRectangle(center - 10, center - 4, 14, 4)
+                    pixmap.fillRectangle(center - 4, center + 2, 14, 4)
+                }
+                "shuffle" -> {
+                    pixmap.setColor(0.9f, 0.5f, 0.1f, 1f)
+                    pixmap.fillCircle(center, center, center - 3)
+                    pixmap.setColor(1f, 1f, 1f, 1f)
+                    pixmap.drawCircle(center, center, center - 8)
+                    pixmap.fillRectangle(center - 2, center - 10, 4, 6)
+                    pixmap.fillRectangle(center - 2, center + 4, 4, 6)
+                }
+                "extra_moves" -> {
+                    pixmap.setColor(0.18f, 0.75f, 0.35f, 1f)
+                    pixmap.fillCircle(center, center, center - 3)
+                    pixmap.setColor(1f, 1f, 1f, 1f)
+                    // Plus 5 text/symbol
+                    pixmap.fillRectangle(center - 8, center - 2, 8, 4)
+                    pixmap.fillRectangle(center - 6, center - 4, 4, 8)
+                    pixmap.fillRectangle(center + 2, center - 6, 6, 12)
+                }
+                "row_clear" -> {
+                    pixmap.setColor(0.9f, 0.4f, 0.2f, 1f)
+                    pixmap.fillCircle(center, center, center - 3)
+                    pixmap.setColor(1f, 1f, 1f, 1f)
+                    pixmap.fillRectangle(center - 12, center - 3, 24, 6)
+                }
+                "color_remove" -> {
+                    pixmap.setColor(0.85f, 0.2f, 0.85f, 1f)
+                    pixmap.fillCircle(center, center, center - 3)
+                    pixmap.setColor(1f, 0.9f, 0.2f, 1f)
+                    pixmap.fillCircle(center, center, center - 8)
+                }
+                "color_bomb", "rainbow_start" -> {
+                    pixmap.setColor(0.95f, 0.2f, 0.8f, 1f)
+                    pixmap.fillCircle(center, center, center - 3)
+                    pixmap.setColor(1f, 0.9f, 0.2f, 1f)
+                    pixmap.fillCircle(center, center, center - 8)
+                }
+                "rocket_start" -> {
+                    pixmap.setColor(0.9f, 0.25f, 0.2f, 1f)
+                    pixmap.fillRectangle(center - 5, 8, 10, size - 16)
+                    pixmap.setColor(1f, 1f, 1f, 1f)
+                    pixmap.fillRectangle(center - 3, size - 10, 6, 6)
+                }
+                "bomb_start" -> {
+                    pixmap.setColor(0.2f, 0.2f, 0.25f, 1f)
+                    pixmap.fillCircle(center, center - 2, center - 5)
+                    pixmap.setColor(1f, 0.8f, 0.2f, 1f)
+                    pixmap.fillRectangle(center - 2, size - 8, 4, 6)
+                }
                 else -> {
                     pixmap.setColor(0.8f, 0.8f, 0.8f, 1f)
                     pixmap.fillCircle(center, center, center - 4)
@@ -522,14 +587,14 @@ object TextureFactory {
             val cy = size / 2
 
             when (specialTypeStr.uppercase()) {
-                "ROCKET_HORIZONTAL" -> {
+                "ROCKET_HORIZONTAL", "LINE_HORIZONTAL" -> {
                     pixmap.setColor(1f, 0.9f, 0.2f, 0.9f)
                     // Draw horizontal arrow
                     pixmap.fillRectangle(cx - size / 3, cy - 4, size * 2 / 3, 8)
                     pixmap.fillTriangle(cx + size / 3, cy - 10, cx + size / 3, cy + 10, cx + size / 2 - 2, cy)
                     pixmap.fillTriangle(cx - size / 3, cy - 10, cx - size / 3, cy + 10, cx - size / 2 + 2, cy)
                 }
-                "ROCKET_VERTICAL" -> {
+                "ROCKET_VERTICAL", "LINE_VERTICAL" -> {
                     pixmap.setColor(1f, 0.9f, 0.2f, 0.9f)
                     // Draw vertical arrow
                     pixmap.fillRectangle(cx - 4, cy - size / 3, 8, size * 2 / 3)
@@ -549,7 +614,7 @@ object TextureFactory {
                     pixmap.setColor(1.0f, 0.9f, 0.2f, 1f)
                     pixmap.fillCircle(cx, cy - size / 3 - 6, 2)
                 }
-                "RAINBOW" -> {
+                "RAINBOW", "COLOR_CLEAR", "CUSTOM_SPECIAL" -> {
                     // Multi-color Crystal Orb
                     pixmap.setColor(0.9f, 0.2f, 0.2f, 1f)
                     pixmap.fillCircle(cx, cy, size / 2 - 4)
@@ -559,6 +624,10 @@ object TextureFactory {
                     pixmap.fillCircle(cx, cy, size / 2 - 16)
                     pixmap.setColor(0.2f, 0.6f, 1.0f, 1f)
                     pixmap.fillCircle(cx, cy, size / 2 - 22)
+                }
+                "ROCKET" -> {
+                    pixmap.setColor(1f, 0.9f, 0.2f, 0.9f)
+                    pixmap.fillRectangle(cx - size / 3, cy - 4, size * 2 / 3, 8)
                 }
             }
         }

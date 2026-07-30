@@ -5,9 +5,9 @@ import com.badlogic.gdx.graphics.g2d.BitmapFont
 import com.badlogic.gdx.graphics.g2d.SpriteBatch
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer
 import com.badlogic.gdx.math.Rectangle
-import com.badlogic.gdx.scenes.scene2d.ui.Image
 import com.example.data.local.entity.BuildingEntity
 import com.example.data.local.entity.BuildingPlotEntity
+import com.example.data.local.entity.DecorationEntity
 import com.example.game.island.building.ConstructionManager
 import com.example.game.island.building.ProductionManager
 import com.example.utils.TextureFactory
@@ -23,6 +23,7 @@ class BuildingRenderer(
     fun renderPlotsAndBuildings(
         plots: List<BuildingPlotEntity>,
         buildingsMap: Map<String, BuildingEntity>,
+        decorations: List<DecorationEntity> = emptyList(),
         currentTime: Long = System.currentTimeMillis()
     ) {
         plotBoundsMap.clear()
@@ -60,11 +61,12 @@ class BuildingRenderer(
                     font.color = Color.WHITE
                     font.draw(batch, "${building.level}", bounds.x + 4f, bounds.y + bounds.height - 3f)
 
-                    // Draw Collect Icon if coins accumulated
-                    val pendingCoins = ProductionManager.calculatePendingCoins(building, currentTime)
-                    if (pendingCoins > 0) {
-                        val coinIcon = TextureFactory.createIcon("coin", 38)
-                        coinIcon.draw(batch, bounds.x + bounds.width / 2f - 19f, bounds.y + bounds.height + 5f, 38f, 38f)
+                    // Draw Collect Icon if resource accumulated
+                    val pendingAmount = ProductionManager.calculatePendingAmount(building, currentTime)
+                    if (pendingAmount > 0) {
+                        val resType = ProductionManager.getProductionType(building)
+                        val resIcon = TextureFactory.createIcon(resType.iconName, 38)
+                        resIcon.draw(batch, bounds.x + bounds.width / 2f - 19f, bounds.y + bounds.height + 5f, 38f, 38f)
                     }
                 }
             } else {
@@ -79,9 +81,18 @@ class BuildingRenderer(
                 }
             }
         }
+
+        // 2. Draw Decorations
+        for (dec in decorations) {
+            val decX = dec.gridX * 60f + 100f
+            val decY = dec.gridY * 60f + 200f
+            val decTex = TextureFactory.createBuildingTexture(dec.decorationId.lowercase(), 60, 60)
+            decTex.draw(batch, decX, decY, 60f, 60f)
+        }
+
         batch.end()
 
-        // 2. Draw Construction Progress Bars with ShapeRenderer
+        // 3. Draw Construction Progress Bars with ShapeRenderer
         shapeRenderer.begin(ShapeRenderer.ShapeType.Filled)
         for (plot in plots) {
             val building = plot.buildingId?.let { buildingsMap[it] }

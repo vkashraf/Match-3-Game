@@ -44,7 +44,7 @@ class BuildingInfoPanel(
 
         val cardTable = Table()
         cardTable.background = TextureFactory.createRoundedPanel(
-            width = 460, height = 520,
+            width = 480, height = 560,
             fillColor = Color(0.12f, 0.16f, 0.24f, 0.96f),
             borderColor = GameConstants.COLOR_GOLD,
             borderThickness = 4,
@@ -65,22 +65,28 @@ class BuildingInfoPanel(
         // Title & Building Image
         val titleLabel = Label(config.buildingType.displayName, titleStyle)
         val levelLabel = Label("Level ${building.level} / ${config.maxLevel}", subStyle)
+        val descLabel = Label(config.description, subStyle)
 
         val buildingImg = Image(TextureFactory.createBuildingTexture(building.buildingType, 110, 110))
 
-        cardTable.add(titleLabel).padBottom(4f).row()
-        cardTable.add(levelLabel).padBottom(12f).row()
-        cardTable.add(buildingImg).size(110f, 110f).padBottom(16f).row()
+        cardTable.add(titleLabel).padBottom(2f).row()
+        cardTable.add(levelLabel).padBottom(4f).row()
+        cardTable.add(descLabel).padBottom(10f).row()
+        cardTable.add(buildingImg).size(110f, 110f).padBottom(12f).row()
 
-        val pendingCoins = ProductionManager.calculatePendingCoins(building)
+        val pendingAmount = ProductionManager.calculatePendingAmount(building)
+        val resType = ProductionManager.getProductionType(building)
         val currentRate = config.productionForLevel(building.level)
         val nextRate = config.productionForLevel(building.level + 1)
-        val upgradeCost = config.costForLevel(building.level + 1)
+
+        val nextCoins = config.costCoinsForLevel(building.level + 1)
+        val nextWood = config.costWoodForLevel(building.level + 1)
+        val nextStone = config.costStoneForLevel(building.level + 1)
+        val nextMetal = config.costMetalForLevel(building.level + 1)
 
         if (building.isConstructing) {
             // Construction Progress UI
             val remainingSecs = ConstructionManager.getRemainingSeconds(building)
-            val progressFraction = ConstructionManager.getProgressFraction(building)
             val remainingText = ConstructionManager.formatRemainingTime(remainingSecs)
             val gemCost = ConstructionManager.getInstantFinishGemCost(building)
 
@@ -103,29 +109,28 @@ class BuildingInfoPanel(
                     BuildingManager.finishInstantWithGems(
                         building = building,
                         onSuccess = { dismiss(); onClose() },
-                        onError = { /* handled by UI */ }
+                        onError = { }
                     )
                 }
             )
 
-            cardTable.add(finishGemsBtn).size(260f, 55f).padBottom(12f).row()
+            cardTable.add(finishGemsBtn).size(260f, 52f).padBottom(12f).row()
         } else {
             // Normal Built Info UI
-            val rateLabel = Label("Production: +$currentRate Coins/hr", textStyle)
-            val capLabel = Label("Max Storage Cap: ${ProductionManager.getMaxStorageCapacity(building)} Coins", subStyle)
-
-            cardTable.add(rateLabel).padBottom(4f).row()
-            cardTable.add(capLabel).padBottom(16f).row()
+            if (currentRate > 0) {
+                val rateLabel = Label("Production: +$currentRate ${resType.displayName}/hr", textStyle)
+                cardTable.add(rateLabel).padBottom(4f).row()
+            }
 
             val btnFont = BitmapFont()
-            btnFont.data.setScale(1.1f)
+            btnFont.data.setScale(1.0f)
             val btnStyle = Label.LabelStyle(btnFont, Color.WHITE)
 
             // Collect Button
-            if (pendingCoins > 0) {
+            if (pendingAmount > 0) {
                 val collectBtn = GameButton(
-                    text = "COLLECT (+$pendingCoins Coins)",
-                    iconDrawable = TextureFactory.createIcon("coin", 28),
+                    text = "COLLECT (+$pendingAmount ${resType.displayName})",
+                    iconDrawable = TextureFactory.createIcon(resType.iconName, 26),
                     bgColor = Color(0.15f, 0.6f, 0.3f, 1f),
                     labelStyle = btnStyle,
                     onClick = {
@@ -136,17 +141,62 @@ class BuildingInfoPanel(
                         )
                     }
                 )
-                cardTable.add(collectBtn).size(300f, 55f).padBottom(12f).row()
+                cardTable.add(collectBtn).size(320f, 52f).padBottom(10f).row()
+            }
+
+            // Quick Special Actions (STORAGE, MARKET, WORKSHOP)
+            when (config.buildingType) {
+                BuildingType.STORAGE -> {
+                    val storageBtn = GameButton(
+                        text = "VIEW STORAGE",
+                        bgColor = Color(0.2f, 0.45f, 0.75f, 1f),
+                        labelStyle = btnStyle,
+                        onClick = {
+                            dismiss()
+                            StoragePanel(stage, font, onClose)
+                        }
+                    )
+                    cardTable.add(storageBtn).size(280f, 46f).padBottom(8f).row()
+                }
+                BuildingType.MARKET -> {
+                    val marketBtn = GameButton(
+                        text = "OPEN MARKET",
+                        bgColor = Color(0.8f, 0.5f, 0.1f, 1f),
+                        labelStyle = btnStyle,
+                        onClick = {
+                            dismiss()
+                            MarketPanel(stage, font, onClose)
+                        }
+                    )
+                    cardTable.add(marketBtn).size(280f, 46f).padBottom(8f).row()
+                }
+                BuildingType.WORKSHOP -> {
+                    val workshopBtn = GameButton(
+                        text = "CRAFT BOOSTERS",
+                        bgColor = Color(0.2f, 0.65f, 0.5f, 1f),
+                        labelStyle = btnStyle,
+                        onClick = {
+                            dismiss()
+                            CraftingPanel(stage, font, onClose)
+                        }
+                    )
+                    cardTable.add(workshopBtn).size(280f, 46f).padBottom(8f).row()
+                }
+                else -> {}
             }
 
             // Upgrade Button
             if (building.level < config.maxLevel) {
-                val nextLabel = Label("Next Level Rate: +$nextRate Coins/hr", subStyle)
-                cardTable.add(nextLabel).padBottom(8f).row()
+                val upgradeCosts = mutableListOf<String>()
+                if (nextCoins > 0) upgradeCosts.add("$nextCoins Coins")
+                if (nextWood > 0) upgradeCosts.add("$nextWood Wood")
+                if (nextStone > 0) upgradeCosts.add("$nextStone Stone")
+                if (nextMetal > 0) upgradeCosts.add("$nextMetal Metal")
+
+                val upgradeCostStr = upgradeCosts.joinToString(", ")
 
                 val upgradeBtn = GameButton(
-                    text = "UPGRADE ($upgradeCost Coins)",
-                    iconDrawable = TextureFactory.createIcon("coin", 28),
+                    text = "UPGRADE ($upgradeCostStr)",
                     bgColor = GameConstants.COLOR_PLAY_BUTTON,
                     borderColor = Color(0.75f, 0.35f, 0.05f, 1f),
                     labelStyle = btnStyle,
@@ -158,10 +208,10 @@ class BuildingInfoPanel(
                         )
                     }
                 )
-                cardTable.add(upgradeBtn).size(300f, 55f).padBottom(12f).row()
+                cardTable.add(upgradeBtn).size(320f, 52f).padBottom(10f).row()
             } else {
                 val maxLabel = Label("MAX LEVEL REACHED", Label.LabelStyle(font, GameConstants.COLOR_GOLD))
-                cardTable.add(maxLabel).padBottom(12f).row()
+                cardTable.add(maxLabel).padBottom(10f).row()
             }
         }
 
@@ -172,7 +222,7 @@ class BuildingInfoPanel(
             labelStyle = Label.LabelStyle(font, Color.WHITE),
             onClick = { dismiss(); onClose() }
         )
-        cardTable.add(closeBtn).size(160f, 45f)
+        cardTable.add(closeBtn).size(160f, 42f)
 
         containerTable.add(cardTable).center()
         stage.addActor(overlay)

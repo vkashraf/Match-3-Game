@@ -57,6 +57,14 @@ class DefeatDialog(
         btnFont.data.setScale(1.1f)
         val btnStyle = Label.LabelStyle(btnFont, Color.WHITE)
 
+        val currentLevelId = levelController.levelConfig.levelId
+        com.example.core.event.GameEventBus.postEvent(
+            com.example.core.event.GameEvent(
+                type = com.example.core.event.GameEventType.LEVEL_FAILED,
+                levelId = currentLevelId
+            )
+        )
+
         val btnTable = Table()
         val retryBtn = GameButton("RETRY", bgColor = Color(0.85f, 0.45f, 0.1f, 1f), labelStyle = btnStyle) {
             remove()

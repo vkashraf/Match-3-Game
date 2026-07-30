@@ -11,7 +11,7 @@ class IslandCameraController(
     val minY: Float = 0f,
     val maxY: Float = GameConstants.VIRTUAL_HEIGHT * 1.5f,
     val minZoom: Float = 0.7f,
-    val maxZoom: Float = 1.4f
+    val maxZoom: Float = 1.8f
 ) {
 
     private val targetPos = Vector2(camera.position.x, camera.position.y)

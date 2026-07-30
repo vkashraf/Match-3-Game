@@ -70,26 +70,36 @@ class BuildPanel(
 
         val player = GameDataProvider.cachedPlayer.value
         val playerLevel = player?.playerLevel ?: 1
-        val playerCoins = player?.coins ?: 0L
 
         val configs = BuildingConfigRepository.getAllConfigs()
 
         val listTable = Table()
         for (config in configs) {
-            val cost = config.costForLevel(1)
+            val costCoins = config.costCoinsForLevel(1)
+            val costWood = config.costWoodForLevel(1)
+            val costStone = config.costStoneForLevel(1)
+            val costMetal = config.costMetalForLevel(1)
+
             val buildImg = Image(TextureFactory.createBuildingTexture(config.buildingType.typeId, 70, 70))
 
             val infoTable = Table()
             infoTable.left()
             val nameLbl = Label(config.buildingType.displayName, nameStyle)
-            val prodLbl = Label("+${config.baseProductionPerHour} Coins/hr • ${config.baseConstructionDurationSecs}s", subStyle)
-            val reqLbl = Label("Cost: $cost Coins (Req Lv.${config.requiredPlayerLevel})", subStyle)
+            val prodLbl = Label("+${config.baseProductionPerHour} ${config.productionType.displayName}/hr • ${config.baseConstructionDurationSecs}s", subStyle)
+
+            val costs = mutableListOf<String>()
+            if (costCoins > 0) costs.add("$costCoins Coins")
+            if (costWood > 0) costs.add("$costWood Wood")
+            if (costStone > 0) costs.add("$costStone Stone")
+            if (costMetal > 0) costs.add("$costMetal Metal")
+
+            val reqLbl = Label("Cost: ${costs.joinToString(", ")} (Req Lv.${config.requiredPlayerLevel})", subStyle)
 
             infoTable.add(nameLbl).left().row()
             infoTable.add(prodLbl).left().row()
             infoTable.add(reqLbl).left()
 
-            val canBuild = playerLevel >= config.requiredPlayerLevel && playerCoins >= cost
+            val canBuild = playerLevel >= config.requiredPlayerLevel
             val btnColor = if (canBuild) GameConstants.COLOR_PLAY_BUTTON else Color(0.4f, 0.4f, 0.45f, 1f)
 
             val buildBtn = GameButton(

@@ -21,4 +21,23 @@ object PlayerLevelConfig {
         }
         return level
     }
+
+    /**
+     * Gets rewards earned when leveling up to a specific level.
+     */
+    fun getLevelUpRewards(newLevel: Int): List<com.example.game.reward.Reward> {
+        val coinAmount = 300 + (newLevel * 100)
+        val gemAmount = 5 + (newLevel * 2)
+        val rewards = mutableListOf(
+            com.example.game.reward.Reward(com.example.game.reward.RewardType.COINS, quantity = coinAmount),
+            com.example.game.reward.Reward(com.example.game.reward.RewardType.GEMS, quantity = gemAmount),
+            com.example.game.reward.Reward(com.example.game.reward.RewardType.ENERGY, quantity = 2)
+        )
+        if (newLevel % 2 == 0) {
+            rewards.add(com.example.game.reward.Reward(com.example.game.reward.RewardType.BOOSTER, itemId = "HAMMER", quantity = 1))
+        } else {
+            rewards.add(com.example.game.reward.Reward(com.example.game.reward.RewardType.BOOSTER, itemId = "SWAP", quantity = 1))
+        }
+        return rewards
+    }
 }

@@ -7,7 +7,11 @@ data class BoardCell(
     val row: Int,
     val col: Int,
     var tile: Tile? = null,
-    var obstacle: Obstacle? = null
+    var obstacle: Obstacle? = null,
+    var isBlocked: Boolean = false,
+    var portalId: String? = null,
+    var jellyLayers: Int = 0
 ) {
-    val isLocked: Boolean get() = obstacle?.blocksMovement == true
+    val isLocked: Boolean get() = isBlocked || obstacle?.blocksMovement == true
+    val isEmpty: Boolean get() = tile == null
 }

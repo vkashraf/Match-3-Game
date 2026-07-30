@@ -81,9 +81,23 @@ class PlayerRepository(private val playerDao: PlayerDao) {
     suspend fun addXp(amount: Long): Boolean {
         if (amount <= 0) return false
         val p = getPlayer()
+        val oldLevel = p.playerLevel
         val newXp = p.xp + amount
         val newLevel = PlayerLevelConfig.getLevelForXp(newXp)
         playerDao.updateXpAndLevel(newXp, newLevel)
+
+        if (newLevel > oldLevel) {
+            for (lvl in (oldLevel + 1)..newLevel) {
+                val rewards = PlayerLevelConfig.getLevelUpRewards(lvl)
+                com.example.game.reward.RewardManager.grantRewards(rewards)
+                com.example.core.event.GameEventBus.emit(
+                    com.example.core.event.GameEvent(
+                        com.example.core.event.GameEventType.PLAYER_LEVEL_UP,
+                        amount = lvl
+                    )
+                )
+            }
+        }
         return true
     }
 

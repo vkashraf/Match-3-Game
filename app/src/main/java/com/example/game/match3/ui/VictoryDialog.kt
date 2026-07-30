@@ -65,7 +65,30 @@ class VictoryDialog(
         val btnStyle = Label.LabelStyle(btnFont, Color.WHITE)
 
         val btnTable = Table()
+        // Post game events for missions/achievements/stats
         val currentLevelId = levelController.levelConfig.levelId
+        com.example.core.event.GameEventBus.postEvent(
+            com.example.core.event.GameEvent(
+                type = com.example.core.event.GameEventType.LEVEL_COMPLETED,
+                levelId = currentLevelId
+            )
+        )
+        if (levelController.finalStarsEarned > 0) {
+            com.example.core.event.GameEventBus.postEvent(
+                com.example.core.event.GameEvent(
+                    type = com.example.core.event.GameEventType.STAR_EARNED,
+                    amount = levelController.finalStarsEarned
+                )
+            )
+        }
+        if (levelController.finalCoinsEarned > 0) {
+            com.example.core.event.GameEventBus.postEvent(
+                com.example.core.event.GameEvent(
+                    type = com.example.core.event.GameEventType.COINS_EARNED,
+                    amount = levelController.finalCoinsEarned
+                )
+            )
+        }
 
         if (currentLevelId < 100) {
             val nextBtn = GameButton("NEXT LEVEL", bgColor = Color(0.15f, 0.65f, 0.25f, 1f), labelStyle = btnStyle) {
@@ -74,8 +97,11 @@ class VictoryDialog(
             }
             btnTable.add(nextBtn).size(130f, 50f).padRight(8f)
         } else {
-            val completeLabel = Label("WORLD COMPLETE!", infoStyle)
-            btnTable.add(completeLabel).padRight(8f)
+            val chapterBtn = GameButton("CHAPTER COMPLETE", bgColor = Color(0.85f, 0.65f, 0.1f, 1f), labelStyle = btnStyle) {
+                remove()
+                screenManager.setScreen(com.example.game.world.ui.ChapterCompleteScreen(game, screenManager))
+            }
+            btnTable.add(chapterBtn).size(160f, 50f).padRight(8f)
         }
 
         val replayBtn = GameButton("REPLAY", bgColor = Color(0.2f, 0.5f, 0.8f, 1f), labelStyle = btnStyle) {

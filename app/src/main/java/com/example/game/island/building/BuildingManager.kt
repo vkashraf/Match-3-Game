@@ -1,8 +1,13 @@
 package com.example.game.island.building
 
 import com.example.core.GameDataProvider
+import com.example.core.event.GameEvent
+import com.example.core.event.GameEventBus
+import com.example.core.event.GameEventType
 import com.example.data.local.entity.BuildingEntity
 import com.example.data.local.entity.BuildingPlotEntity
+import com.example.game.resource.ResourceManager
+import com.example.game.resource.ResourceType
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -37,15 +42,10 @@ object BuildingManager {
                 }
 
                 val config = BuildingConfigRepository.getConfig(type)
-                val cost = config.costForLevel(1)
-
-                if (player.coins < cost) {
-                    withContext(Dispatchers.Main) {
-                        isBusy = false
-                        onError("Not enough coins! Need $cost coins.")
-                    }
-                    return@launch
-                }
+                val costCoins = config.costCoinsForLevel(1)
+                val costWood = config.costWoodForLevel(1)
+                val costStone = config.costStoneForLevel(1)
+                val costMetal = config.costMetalForLevel(1)
 
                 if (player.playerLevel < config.requiredPlayerLevel) {
                     withContext(Dispatchers.Main) {
@@ -63,8 +63,28 @@ object BuildingManager {
                     return@launch
                 }
 
-                // Spend coins
-                GameDataProvider.spendCoins(cost)
+                val affordable = ResourceManager.canAfford(
+                    coins = costCoins,
+                    wood = costWood,
+                    stone = costStone,
+                    metal = costMetal
+                )
+
+                if (!affordable) {
+                    withContext(Dispatchers.Main) {
+                        isBusy = false
+                        onError("Insufficient materials or coins to construct ${type.displayName}!")
+                    }
+                    return@launch
+                }
+
+                // Spend resources
+                ResourceManager.spendResources(
+                    coins = costCoins,
+                    wood = costWood,
+                    stone = costStone,
+                    metal = costMetal
+                )
 
                 val now = System.currentTimeMillis()
                 val durationSecs = config.constructionDurationSecs(1)
@@ -87,6 +107,13 @@ object BuildingManager {
                 // Save building and link to plot
                 GameDataProvider.buildingRepository.insertBuilding(building)
                 GameDataProvider.islandRepository.updatePlot(plot.copy(buildingId = newBuildingId))
+
+                GameEventBus.postEvent(
+                    GameEvent(
+                        type = GameEventType.BUILDING_BUILT,
+                        buildingId = newBuildingId
+                    )
+                )
 
                 withContext(Dispatchers.Main) {
                     isBusy = false
@@ -133,26 +160,33 @@ object BuildingManager {
                     return@launch
                 }
 
-                val player = GameDataProvider.playerRepository.getPlayer()
-                if (player == null) {
+                val costCoins = config.costCoinsForLevel(nextLevel)
+                val costWood = config.costWoodForLevel(nextLevel)
+                val costStone = config.costStoneForLevel(nextLevel)
+                val costMetal = config.costMetalForLevel(nextLevel)
+
+                val affordable = ResourceManager.canAfford(
+                    coins = costCoins,
+                    wood = costWood,
+                    stone = costStone,
+                    metal = costMetal
+                )
+
+                if (!affordable) {
                     withContext(Dispatchers.Main) {
                         isBusy = false
-                        onError("Player error")
+                        onError("Not enough resources to upgrade to Level $nextLevel!")
                     }
                     return@launch
                 }
 
-                val cost = config.costForLevel(nextLevel)
-                if (player.coins < cost) {
-                    withContext(Dispatchers.Main) {
-                        isBusy = false
-                        onError("Not enough coins! Need $cost coins.")
-                    }
-                    return@launch
-                }
-
-                // Spend coins
-                GameDataProvider.spendCoins(cost)
+                // Spend resources
+                ResourceManager.spendResources(
+                    coins = costCoins,
+                    wood = costWood,
+                    stone = costStone,
+                    metal = costMetal
+                )
 
                 val now = System.currentTimeMillis()
                 val durationSecs = config.constructionDurationSecs(nextLevel)
@@ -167,6 +201,13 @@ object BuildingManager {
                 )
 
                 GameDataProvider.buildingRepository.updateBuilding(updatedBuilding)
+
+                GameEventBus.postEvent(
+                    GameEvent(
+                        type = GameEventType.BUILDING_UPGRADED,
+                        buildingId = updatedBuilding.buildingId
+                    )
+                )
 
                 withContext(Dispatchers.Main) {
                     isBusy = false
@@ -250,7 +291,7 @@ object BuildingManager {
      */
     fun collectProduction(
         building: BuildingEntity,
-        onSuccess: (Long) -> Unit = {},
+        onSuccess: (Int) -> Unit = {},
         onError: (String) -> Unit = {}
     ) {
         if (isBusy) return
@@ -258,11 +299,21 @@ object BuildingManager {
 
         scope.launch {
             try {
-                val pendingCoins = ProductionManager.calculatePendingCoins(building)
-                if (pendingCoins <= 0) {
+                val pendingAmount = ProductionManager.calculatePendingAmount(building)
+                val resType = ProductionManager.getProductionType(building)
+
+                if (pendingAmount <= 0) {
                     withContext(Dispatchers.Main) {
                         isBusy = false
                         onError("Nothing to collect yet!")
+                    }
+                    return@launch
+                }
+
+                if (ResourceManager.isStorageFull(resType)) {
+                    withContext(Dispatchers.Main) {
+                        isBusy = false
+                        onError("Storage for ${resType.displayName} is FULL! Upgrade Storage to collect more.")
                     }
                     return@launch
                 }
@@ -271,16 +322,64 @@ object BuildingManager {
                 val updatedBuilding = building.copy(lastCollectedAt = now)
 
                 GameDataProvider.buildingRepository.updateBuilding(updatedBuilding)
-                GameDataProvider.addCoins(pendingCoins)
+                ResourceManager.addResource(resType, pendingAmount)
+
+                GameEventBus.postEvent(
+                    GameEvent(
+                        type = GameEventType.PRODUCTION_COLLECTED,
+                        amount = pendingAmount
+                    )
+                )
 
                 withContext(Dispatchers.Main) {
                     isBusy = false
-                    onSuccess(pendingCoins)
+                    onSuccess(pendingAmount)
                 }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
                     isBusy = false
                     onError(e.localizedMessage ?: "Collection failed")
+                }
+            }
+        }
+    }
+
+    /**
+     * Relocates a building to a new empty unlocked plot.
+     */
+    fun moveBuilding(
+        building: BuildingEntity,
+        currentPlot: BuildingPlotEntity,
+        newPlot: BuildingPlotEntity,
+        onSuccess: () -> Unit = {},
+        onError: (String) -> Unit = {}
+    ) {
+        if (isBusy) return
+        isBusy = true
+
+        scope.launch {
+            try {
+                if (!newPlot.isUnlocked || newPlot.buildingId != null) {
+                    withContext(Dispatchers.Main) {
+                        isBusy = false
+                        onError("Target plot is unavailable!")
+                    }
+                    return@launch
+                }
+
+                // Clear current plot and assign to new plot
+                GameDataProvider.islandRepository.updatePlot(currentPlot.copy(buildingId = null))
+                GameDataProvider.islandRepository.updatePlot(newPlot.copy(buildingId = building.buildingId))
+                GameDataProvider.buildingRepository.updateBuilding(building.copy(plotId = newPlot.plotId))
+
+                withContext(Dispatchers.Main) {
+                    isBusy = false
+                    onSuccess()
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    isBusy = false
+                    onError(e.localizedMessage ?: "Move building failed")
                 }
             }
         }

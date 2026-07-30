@@ -24,6 +24,8 @@ import com.example.game.match3.swap.SwapManager
 import com.example.game.match3.tile.Tile
 import com.example.game.match3.tile.TileState
 import com.example.game.match3.tile.TileType
+import com.example.manager.SoundManager
+import com.example.utils.HapticManager
 
 enum class ResolverState {
     IDLE,
@@ -157,6 +159,13 @@ class MatchResolver(
                                 val worldX = boardX + pos.col * tileSize + tileSize / 2f
                                 val worldY = boardY + pos.row * tileSize + tileSize / 2f
                                 particleEffectManager.spawnExplosion(worldX, worldY, Color.GOLD, 15)
+
+                                com.example.core.event.GameEventBus.postEvent(
+                                    com.example.core.event.GameEvent(
+                                        type = com.example.core.event.GameEventType.SPECIAL_CREATED,
+                                        itemId = creation.specialType.name
+                                    )
+                                )
                             }
                         }
 
@@ -240,6 +249,13 @@ class MatchResolver(
                         if (tile != null) {
                             tile.specialType = creation.specialType
                             initialPositions.remove(pos)
+
+                            com.example.core.event.GameEventBus.postEvent(
+                                com.example.core.event.GameEvent(
+                                    type = com.example.core.event.GameEventType.SPECIAL_CREATED,
+                                    itemId = creation.specialType.name
+                                )
+                            )
                         }
                     }
 
@@ -276,6 +292,18 @@ class MatchResolver(
         }
     }
 
+    fun triggerBoosterClear(positions: Set<BoardPosition>, bonusScore: Int = 150) {
+        if (positions.isEmpty()) return
+        val (expandedPositions, bonus) = specialComboResolver.expandSpecialActivations(
+            boardModel = boardModel,
+            initialPositions = positions,
+            isSpecialSwap = false,
+            swapPos1 = null,
+            swapPos2 = null
+        )
+        startClearingTiles(expandedPositions, bonusScore + bonus, 0f, 0f)
+    }
+
     private fun startClearingTiles(
         positions: Set<BoardPosition>,
         bonusScore: Int,
@@ -284,6 +312,30 @@ class MatchResolver(
     ) {
         val combo = comboManager.increment()
         val comboMultiplier = comboManager.getMultiplier()
+
+        if (combo > 1) {
+            com.example.core.event.GameEventBus.postEvent(
+                com.example.core.event.GameEvent(
+                    type = com.example.core.event.GameEventType.COMBO_TRIGGERED,
+                    amount = combo
+                )
+            )
+            com.example.core.event.GameEventBus.postEvent(
+                com.example.core.event.GameEvent(
+                    type = com.example.core.event.GameEventType.CASCADE_TRIGGERED,
+                    amount = combo
+                )
+            )
+            com.example.manager.SoundManager.playSound("combo")
+            if (combo >= 5) {
+                com.example.utils.HapticManager.vibrateStrong()
+            } else {
+                com.example.utils.HapticManager.vibrateMedium()
+            }
+        } else {
+            com.example.manager.SoundManager.playSound("tile_match")
+            com.example.utils.HapticManager.vibrateSmall()
+        }
 
         val basePoints = ScoreConfig.calculateScore(positions.size, comboMultiplier) + bonusScore
         scoreManager.addScore(basePoints)
@@ -322,8 +374,16 @@ class MatchResolver(
                 avgY += worldY
 
                 if (tile.specialType != SpecialType.NONE) {
-                    screenShakeController.shake(0.3f, 10f)
-                    particleEffectManager.spawnExplosion(worldX, worldY, Color.CYAN, 16)
+                    screenShakeController.shake(0.3f, 12f)
+                    particleEffectManager.spawnExplosion(worldX, worldY, Color.CYAN, 18)
+                    com.example.manager.SoundManager.playSound("special_activate")
+                    com.example.utils.HapticManager.vibrateMedium()
+                    com.example.core.event.GameEventBus.postEvent(
+                        com.example.core.event.GameEvent(
+                            type = com.example.core.event.GameEventType.SPECIAL_ACTIVATED,
+                            itemId = tile.specialType.name
+                        )
+                    )
                 } else {
                     particleEffectManager.spawnExplosion(worldX, worldY, Color.CORAL, 6)
                 }
@@ -339,11 +399,39 @@ class MatchResolver(
         }
 
         goalManager.onTilesCleared(clearedTypes)
+        if (clearedTypes.isNotEmpty()) {
+            com.example.core.event.GameEventBus.postEvent(
+                com.example.core.event.GameEvent(
+                    type = com.example.core.event.GameEventType.TILE_MATCHED,
+                    amount = clearedTypes.size
+                )
+            )
+            com.example.core.event.GameEventBus.postEvent(
+                com.example.core.event.GameEvent(
+                    type = com.example.core.event.GameEventType.TILES_CLEARED,
+                    amount = clearedTypes.size
+                )
+            )
+        }
         if (destroyedObstacleTypes.isNotEmpty()) {
             goalManager.onObstaclesDestroyed(destroyedObstacleTypes)
+            com.example.core.event.GameEventBus.postEvent(
+                com.example.core.event.GameEvent(
+                    type = com.example.core.event.GameEventType.OBSTACLE_DESTROYED,
+                    amount = destroyedObstacleTypes.size
+                )
+            )
         }
 
-        val textStr = if (combo > 1) "+$basePoints\nCOMBO x$combo!" else "+$basePoints"
+        val milestoneStr = when (combo) {
+            3 -> "\nNICE!"
+            5 -> "\nGREAT!"
+            8 -> "\nAMAZING!"
+            10 -> "\nUNSTOPPABLE!"
+            else -> ""
+        }
+
+        val textStr = if (combo > 1) "+$basePoints\nCOMBO x$combo!$milestoneStr" else "+$basePoints"
         floatingTexts.add(FloatingText(textStr, avgX, avgY))
 
         clearAnimTime = 0f

@@ -97,7 +97,7 @@ class SpecialComboResolver {
 
                 val centerPos = swapPos2
 
-                if (s1 == SpecialType.RAINBOW && s2 == SpecialType.RAINBOW) {
+                if (isRainbow(s1) && isRainbow(s2)) {
                     // RAINBOW + RAINBOW -> Clear entire board!
                     for (r in 0 until boardModel.rows) {
                         for (c in 0 until boardModel.columns) {
@@ -105,7 +105,7 @@ class SpecialComboResolver {
                         }
                     }
                     scoreBonus += 1000
-                } else if ((s1 == SpecialType.RAINBOW && isRocket(s2)) || (s2 == SpecialType.RAINBOW && isRocket(s1))) {
+                } else if ((isRainbow(s1) && isRocket(s2)) || (isRainbow(s2) && isRocket(s1))) {
                     // RAINBOW + ROCKET -> Transform all of rocket's base color into rockets and trigger
                     val rocketTile = if (isRocket(s1)) t1 else t2
                     val targetType = rocketTile.type
@@ -120,7 +120,7 @@ class SpecialComboResolver {
                         }
                     }
                     scoreBonus += 600
-                } else if ((s1 == SpecialType.RAINBOW && s2 == SpecialType.BOMB) || (s2 == SpecialType.RAINBOW && s1 == SpecialType.BOMB)) {
+                } else if ((isRainbow(s1) && s2 == SpecialType.BOMB) || (isRainbow(s2) && s1 == SpecialType.BOMB)) {
                     // RAINBOW + BOMB -> Transform all of bomb's base color into bombs and trigger
                     val bombTile = if (s1 == SpecialType.BOMB) t1 else t2
                     val targetType = bombTile.type
@@ -135,9 +135,9 @@ class SpecialComboResolver {
                         }
                     }
                     scoreBonus += 600
-                } else if (s1 == SpecialType.RAINBOW || s2 == SpecialType.RAINBOW) {
+                } else if (isRainbow(s1) || isRainbow(s2)) {
                     // RAINBOW + NORMAL
-                    val normalTile = if (s1 != SpecialType.RAINBOW) t1 else t2
+                    val normalTile = if (!isRainbow(s1)) t1 else t2
                     val targetType = normalTile.type
 
                     for (r in 0 until boardModel.rows) {
@@ -184,7 +184,7 @@ class SpecialComboResolver {
             activatedSpecials.add(pos)
 
             when (tile.specialType) {
-                SpecialType.ROCKET_HORIZONTAL -> {
+                SpecialType.ROCKET_HORIZONTAL, SpecialType.LINE_HORIZONTAL -> {
                     addRow(boardModel, pos.row, finalCleared)
                     for (c in 0 until boardModel.columns) {
                         val p = BoardPosition(pos.row, c)
@@ -194,7 +194,7 @@ class SpecialComboResolver {
                     }
                     scoreBonus += 100
                 }
-                SpecialType.ROCKET_VERTICAL -> {
+                SpecialType.ROCKET_VERTICAL, SpecialType.LINE_VERTICAL -> {
                     addCol(boardModel, pos.col, finalCleared)
                     for (r in 0 until boardModel.rows) {
                         val p = BoardPosition(r, pos.col)
@@ -215,8 +215,8 @@ class SpecialComboResolver {
                     }
                     scoreBonus += 150
                 }
-                SpecialType.RAINBOW -> {
-                    // Clear all tiles of same color as a random normal tile
+                SpecialType.RAINBOW, SpecialType.COLOR_CLEAR, SpecialType.CUSTOM_SPECIAL -> {
+                    // Clear all tiles of same color as a target tile
                     val targetType = tile.type
                     for (r in 0 until boardModel.rows) {
                         for (c in 0 until boardModel.columns) {
@@ -228,7 +228,7 @@ class SpecialComboResolver {
                     }
                     scoreBonus += 200
                 }
-                SpecialType.NONE -> {}
+                SpecialType.NONE, SpecialType.ROCKET -> {}
             }
         }
 
@@ -236,7 +236,13 @@ class SpecialComboResolver {
     }
 
     private fun isRocket(type: SpecialType): Boolean {
-        return type == SpecialType.ROCKET_HORIZONTAL || type == SpecialType.ROCKET_VERTICAL
+        return type == SpecialType.ROCKET_HORIZONTAL || type == SpecialType.ROCKET_VERTICAL ||
+                type == SpecialType.LINE_HORIZONTAL || type == SpecialType.LINE_VERTICAL ||
+                type == SpecialType.ROCKET
+    }
+
+    private fun isRainbow(type: SpecialType): Boolean {
+        return type == SpecialType.RAINBOW || type == SpecialType.COLOR_CLEAR || type == SpecialType.CUSTOM_SPECIAL
     }
 
     private fun addRow(boardModel: BoardModel, r: Int, set: MutableSet<BoardPosition>) {

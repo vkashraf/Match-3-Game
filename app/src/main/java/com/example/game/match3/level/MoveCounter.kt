@@ -8,4 +8,10 @@ class MoveCounter(var movesRemaining: Int = 28) {
         }
         return false
     }
+
+    fun addMoves(amount: Int) {
+        if (amount > 0) {
+            movesRemaining += amount
+        }
+    }
 }

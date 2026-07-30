@@ -5,5 +5,6 @@ enum class Difficulty {
     NORMAL,
     HARD,
     VERY_HARD,
-    EXPERT
+    EXPERT,
+    EXTREME
 }

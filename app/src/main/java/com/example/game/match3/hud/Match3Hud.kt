@@ -7,17 +7,24 @@ import com.badlogic.gdx.scenes.scene2d.ui.Image
 import com.badlogic.gdx.scenes.scene2d.ui.Label
 import com.badlogic.gdx.scenes.scene2d.ui.Table
 import com.example.core.GameConstants
+import com.example.core.GameDataProvider
+import com.example.game.match3.booster.BoosterType
 import com.example.game.match3.level.LevelGoal
 import com.example.game.match3.level.MoveCounter
 import com.example.game.match3.score.ScoreManager
 import com.example.ui.GameButton
 import com.example.utils.TextureFactory
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
 
 class Match3Hud(
     private val stage: Stage,
     private val moveCounter: MoveCounter,
     private val scoreManager: ScoreManager,
     private val goals: List<LevelGoal>,
+    private val onBoosterClick: (BoosterType) -> Unit,
     private val onSettingsClick: () -> Unit
 ) {
 
@@ -30,9 +37,39 @@ class Match3Hud(
     private val movesLabel = Label(moveCounter.movesRemaining.toString(), valueStyle)
     private val scoreLabel = Label(scoreManager.currentScore.toString(), valueStyle)
 
+    private val hammerQtyLabel = Label("0", Label.LabelStyle(fontSmall, GameConstants.COLOR_GOLD))
+    private val swapQtyLabel = Label("0", Label.LabelStyle(fontSmall, GameConstants.COLOR_GOLD))
+    private val shuffleQtyLabel = Label("0", Label.LabelStyle(fontSmall, GameConstants.COLOR_GOLD))
+    private val movesQtyLabel = Label("0", Label.LabelStyle(fontSmall, GameConstants.COLOR_GOLD))
+    private val rowClearQtyLabel = Label("0", Label.LabelStyle(fontSmall, GameConstants.COLOR_GOLD))
+    private val colorRemoveQtyLabel = Label("0", Label.LabelStyle(fontSmall, GameConstants.COLOR_GOLD))
+
+    private val bannerTable = Table()
+    private val bannerLabel = Label("", valueStyle)
+
+    private val scope = CoroutineScope(Dispatchers.IO)
+
     init {
         setupTopBar()
         setupBottomBar()
+        setupBanner()
+        observeInventory()
+    }
+
+    private fun observeInventory() {
+        scope.launch {
+            GameDataProvider.inventoryRepository.allItemsFlow.collectLatest { items ->
+                val map = items.associate { it.itemId to it.quantity }
+                launch(Dispatchers.Main) {
+                    hammerQtyLabel.setText("${map["HAMMER"] ?: 0}")
+                    swapQtyLabel.setText("${map["SWAP"] ?: 0}")
+                    shuffleQtyLabel.setText("${map["SHUFFLE"] ?: 0}")
+                    movesQtyLabel.setText("${map["EXTRA_MOVES"] ?: 0}")
+                    rowClearQtyLabel.setText("${map["ROW_CLEAR"] ?: 0}")
+                    colorRemoveQtyLabel.setText("${map["COLOR_REMOVE"] ?: 0}")
+                }
+            }
+        }
     }
 
     private fun setupTopBar() {
@@ -45,8 +82,7 @@ class Match3Hud(
         // MOVES Panel
         val movesBox = Table()
         movesBox.background = TextureFactory.createRoundedPanel(
-            width = 110,
-            height = 70,
+            width = 110, height = 70,
             fillColor = Color(0.12f, 0.22f, 0.38f, 0.9f),
             borderColor = GameConstants.COLOR_GOLD,
             borderThickness = 2
@@ -57,13 +93,12 @@ class Match3Hud(
         // GOALS Panel
         val goalsBox = Table()
         goalsBox.background = TextureFactory.createRoundedPanel(
-            width = 220,
-            height = 70,
+            width = 220, height = 70,
             fillColor = Color(0.12f, 0.22f, 0.38f, 0.9f),
             borderColor = GameConstants.COLOR_GOLD,
             borderThickness = 2
         )
-        goalsBox.add(Label("TARGETS", titleStyle)).colspan(goals.size).padTop(4f).row()
+        goalsBox.add(Label("TARGETS", titleStyle)).colspan(goals.size.coerceAtLeast(1)).padTop(4f).row()
 
         goals.forEach { goal ->
             val goalItem = Table()
@@ -80,8 +115,7 @@ class Match3Hud(
         // SCORE Panel
         val scoreBox = Table()
         scoreBox.background = TextureFactory.createRoundedPanel(
-            width = 110,
-            height = 70,
+            width = 110, height = 70,
             fillColor = Color(0.12f, 0.22f, 0.38f, 0.9f),
             borderColor = GameConstants.COLOR_GOLD,
             borderThickness = 2
@@ -95,11 +129,10 @@ class Match3Hud(
 
         topTable.row().padTop(8f)
 
-        // STAR PROGRESS BAR PLACEHOLDER
+        // STAR BAR
         val starBar = Table()
         starBar.background = TextureFactory.createRoundedPanel(
-            width = 460,
-            height = 24,
+            width = 460, height = 24,
             fillColor = Color(0.08f, 0.12f, 0.22f, 0.8f),
             borderColor = Color(0.3f, 0.5f, 0.7f, 1f),
             borderThickness = 2,
@@ -123,24 +156,88 @@ class Match3Hud(
     private fun setupBottomBar() {
         val bottomTable = Table()
         bottomTable.bottom()
-        bottomTable.setSize(GameConstants.VIRTUAL_WIDTH, 90f)
-        bottomTable.setPosition(0f, 15f)
+        bottomTable.setSize(GameConstants.VIRTUAL_WIDTH, 100f)
+        bottomTable.setPosition(0f, 10f)
 
-        // Boosters
-        val hammerBtn = GameButton("", iconDrawable = TextureFactory.createBoosterIcon("hammer", 36), bgColor = Color(0.15f, 0.25f, 0.4f, 0.9f), labelStyle = valueStyle) {}
-        val rocketBtn = GameButton("", iconDrawable = TextureFactory.createBoosterIcon("rocket", 36), bgColor = Color(0.15f, 0.25f, 0.4f, 0.9f), labelStyle = valueStyle) {}
-        val rainbowBtn = GameButton("", iconDrawable = TextureFactory.createBoosterIcon("rainbow", 36), bgColor = Color(0.15f, 0.25f, 0.4f, 0.9f), labelStyle = valueStyle) {}
+        val hammerBtn = createBoosterItemButton("hammer", hammerQtyLabel) {
+            onBoosterClick(BoosterType.HAMMER)
+        }
+        val swapBtn = createBoosterItemButton("swap", swapQtyLabel) {
+            onBoosterClick(BoosterType.SWAP)
+        }
+        val shuffleBtn = createBoosterItemButton("shuffle", shuffleQtyLabel) {
+            onBoosterClick(BoosterType.SHUFFLE)
+        }
+        val rowClearBtn = createBoosterItemButton("row_clear", rowClearQtyLabel) {
+            onBoosterClick(BoosterType.ROW_CLEAR)
+        }
+        val colorRemoveBtn = createBoosterItemButton("color_remove", colorRemoveQtyLabel) {
+            onBoosterClick(BoosterType.COLOR_REMOVE)
+        }
+        val movesBtn = createBoosterItemButton("extra_moves", movesQtyLabel) {
+            onBoosterClick(BoosterType.EXTRA_MOVES)
+        }
 
         val settingsBtn = GameButton("", iconDrawable = TextureFactory.createIcon("menu", 32), bgColor = Color(0.2f, 0.35f, 0.55f, 0.9f), labelStyle = valueStyle) {
             onSettingsClick()
         }
 
-        bottomTable.add(hammerBtn).size(60f, 60f).padRight(16f)
-        bottomTable.add(rocketBtn).size(60f, 60f).padRight(16f)
-        bottomTable.add(rainbowBtn).size(60f, 60f).padRight(40f)
-        bottomTable.add(settingsBtn).size(60f, 60f)
+        bottomTable.add(hammerBtn).size(56f, 56f).padRight(4f)
+        bottomTable.add(swapBtn).size(56f, 56f).padRight(4f)
+        bottomTable.add(shuffleBtn).size(56f, 56f).padRight(4f)
+        bottomTable.add(rowClearBtn).size(56f, 56f).padRight(4f)
+        bottomTable.add(colorRemoveBtn).size(56f, 56f).padRight(4f)
+        bottomTable.add(movesBtn).size(56f, 56f).padRight(8f)
+        bottomTable.add(settingsBtn).size(48f, 48f)
 
         stage.addActor(bottomTable)
+    }
+
+    private fun createBoosterItemButton(iconName: String, qtyLabel: Label, onClick: () -> Unit): Table {
+        val container = Table()
+        val btn = GameButton("", iconDrawable = TextureFactory.createIcon(iconName, 36), bgColor = Color(0.15f, 0.25f, 0.4f, 0.95f), labelStyle = valueStyle, onClick = onClick)
+
+        container.add(btn).size(56f, 56f).row()
+
+        val badge = Table()
+        badge.background = TextureFactory.createCircleTexture(22, Color(0.1f, 0.15f, 0.25f, 1f), GameConstants.COLOR_GOLD)
+        badge.add(qtyLabel).center()
+
+        container.add(badge).size(22f, 22f).padTop(-12f)
+        return container
+    }
+
+    private fun setupBanner() {
+        bannerTable.background = TextureFactory.createRoundedPanel(
+            width = 460, height = 45,
+            fillColor = Color(0.1f, 0.18f, 0.32f, 0.95f),
+            borderColor = GameConstants.COLOR_GOLD,
+            borderThickness = 2
+        )
+        bannerTable.setSize(460f, 45f)
+        bannerTable.setPosition(GameConstants.VIRTUAL_WIDTH / 2f - 230f, GameConstants.VIRTUAL_HEIGHT - 195f)
+        bannerTable.add(bannerLabel).center()
+        bannerTable.isVisible = false
+
+        stage.addActor(bannerTable)
+    }
+
+    fun showBanner(msg: String, autoHideSeconds: Float = 2.5f) {
+        bannerLabel.setText(msg)
+        bannerTable.isVisible = true
+        bannerTable.clearActions()
+
+        if (autoHideSeconds > 0f) {
+            bannerTable.addAction(com.badlogic.gdx.scenes.scene2d.actions.Actions.sequence(
+                com.badlogic.gdx.scenes.scene2d.actions.Actions.delay(autoHideSeconds),
+                com.badlogic.gdx.scenes.scene2d.actions.Actions.run { bannerTable.isVisible = false }
+            ))
+        }
+    }
+
+    fun hideBanner() {
+        bannerTable.isVisible = false
+        bannerTable.clearActions()
     }
 
     fun update() {

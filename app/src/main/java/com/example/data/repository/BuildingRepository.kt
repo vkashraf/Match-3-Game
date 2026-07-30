@@ -8,6 +8,10 @@ class BuildingRepository(private val buildingDao: BuildingDao) {
 
     val allBuildingsFlow: Flow<List<BuildingEntity>> = buildingDao.getAllBuildings()
 
+    suspend fun getAllBuildings(): List<BuildingEntity> {
+        return buildingDao.getAllBuildingsList()
+    }
+
     suspend fun getBuilding(buildingId: String): BuildingEntity? {
         return buildingDao.getBuilding(buildingId)
     }

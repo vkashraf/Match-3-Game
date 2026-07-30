@@ -2,7 +2,7 @@ package com.example.game.match3.level
 
 object LevelConfigValidator {
     fun validate(config: LevelConfig): Boolean {
-        if (config.levelId < 1 || config.levelId > 100) return false
+        if (config.levelId < 1 || config.levelId > 200) return false
         if (config.moves <= 0) return false
         if (config.goals.isEmpty()) return false
         for (g in config.goals) {

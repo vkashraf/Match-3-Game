@@ -14,6 +14,9 @@ interface BuildingDao {
     @Query("SELECT * FROM buildings")
     fun getAllBuildings(): Flow<List<BuildingEntity>>
 
+    @Query("SELECT * FROM buildings")
+    suspend fun getAllBuildingsList(): List<BuildingEntity>
+
     @Query("SELECT * FROM buildings WHERE buildingId = :buildingId")
     suspend fun getBuilding(buildingId: String): BuildingEntity?
 

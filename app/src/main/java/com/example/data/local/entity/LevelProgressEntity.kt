@@ -11,5 +11,9 @@ data class LevelProgressEntity(
     val stars: Int = 0,
     val bestScore: Int = 0,
     val bestMoves: Int = 0,
-    val completedAt: Long = 0
+    val completedAt: Long = 0,
+    val timesPlayed: Int = 0,
+    val timesWon: Int = 0,
+    val timesLost: Int = 0,
+    val lastPlayedAt: Long = 0
 )

@@ -19,14 +19,18 @@ import com.example.core.GameDataProvider
 import com.example.core.ScreenManager
 import com.example.data.local.entity.BuildingEntity
 import com.example.data.local.entity.BuildingPlotEntity
+import com.example.data.local.entity.DecorationEntity
 import com.example.data.local.entity.IslandZoneEntity
 import com.example.game.island.building.ConstructionManager
 import com.example.game.island.camera.IslandCameraController
+import com.example.game.island.rating.IslandRatingManager
 import com.example.game.island.renderer.BuildingRenderer
 import com.example.game.island.renderer.IslandRenderer
 import com.example.game.island.ui.BuildPanel
 import com.example.game.island.ui.BuildingInfoPanel
+import com.example.game.island.ui.EditModePanel
 import com.example.game.island.ui.LockedPlotPopup
+import com.example.game.island.ui.OfflineSummaryPopup
 import com.example.game.island.ui.ZoneUnlockPopup
 import com.example.ui.FeatureButton
 import com.example.ui.GameButton
@@ -61,14 +65,17 @@ class HomeScreen(
     private var plotsList = listOf<BuildingPlotEntity>()
     private var zonesMap = mapOf<Int, IslandZoneEntity>()
     private var buildingsMap = mapOf<String, BuildingEntity>()
+    private var decorationsList = listOf<DecorationEntity>()
 
     private lateinit var playerBadge: PlayerBadge
     private lateinit var coinCounter: ResourceCounter
     private lateinit var gemCounter: ResourceCounter
     private lateinit var energyCounter: ResourceCounter
+    private lateinit var ratingLabel: Label
     private var debugOverlayTable: Table? = null
 
     private var activePopupOpen = false
+    private var isEditMode = false
 
     init {
         font.data.setScale(1.2f)
@@ -80,26 +87,45 @@ class HomeScreen(
         setupDebugOverlay()
 
         observeIslandData()
+        observeBadges()
+        checkOfflineProduction()
 
         stage.root.getColor().a = 0f
         stage.root.addAction(Actions.fadeIn(0.4f))
+    }
+
+    private fun checkOfflineProduction() {
+        activePopupOpen = true
+        OfflineSummaryPopup(stage, font) {
+            activePopupOpen = false
+        }
+    }
+
+    private fun observeBadges() {
+        com.example.game.badge.BadgeManager.refreshBadges()
+        scope.launch {
+            com.example.game.badge.BadgeManager.badgeState.collectLatest { state ->
+                // Badges updated
+            }
+        }
     }
 
     private fun observeIslandData() {
         scope.launch {
             GameDataProvider.islandRepository.allPlotsFlow.collectLatest { plots ->
                 plotsList = plots
+                updateRating()
             }
         }
         scope.launch {
             GameDataProvider.islandRepository.allZonesFlow.collectLatest { zones ->
                 zonesMap = zones.associateBy { it.zoneId }
+                updateRating()
             }
         }
         scope.launch {
             GameDataProvider.buildingRepository.allBuildingsFlow.collectLatest { buildings ->
                 val bMap = buildings.associateBy { it.buildingId }
-                // Check if any building finished construction
                 val now = System.currentTimeMillis()
                 for (building in buildings) {
                     val finished = ConstructionManager.checkAndFinishConstruction(building, now)
@@ -108,6 +134,26 @@ class HomeScreen(
                     }
                 }
                 buildingsMap = bMap
+                updateRating()
+            }
+        }
+        scope.launch {
+            GameDataProvider.decorationRepository.allDecorationsFlow.collectLatest { decs ->
+                decorationsList = decs
+                updateRating()
+            }
+        }
+    }
+
+    private fun updateRating() {
+        val score = IslandRatingManager.calculateBeautyScore(
+            buildingsMap.values.toList(),
+            decorationsList,
+            zonesMap.values.toList()
+        )
+        stage.root?.let {
+            if (::ratingLabel.isInitialized) {
+                ratingLabel.setText("⭐ $score")
             }
         }
     }
@@ -140,7 +186,6 @@ class HomeScreen(
             override fun touchUp(screenX: Int, screenY: Int, pointer: Int, button: Int): Boolean {
                 if (activePopupOpen || isDragging) return false
 
-                // Convert screen coordinates to world position
                 val touchVector = stage.viewport.unproject(Vector2(screenX.toFloat(), screenY.toFloat()))
                 val clickedPlot = buildingRenderer.getPlotAt(touchVector.x, touchVector.y, plotsList)
 
@@ -171,7 +216,6 @@ class HomeScreen(
 
         val zone = zonesMap[plot.zoneId]
         if (zone != null && !zone.isUnlocked) {
-            // Show Zone unlock popup
             activePopupOpen = true
             ZoneUnlockPopup(stage, font, zone) {
                 activePopupOpen = false
@@ -180,7 +224,6 @@ class HomeScreen(
         }
 
         if (!plot.isUnlocked) {
-            // Show Locked Plot popup
             activePopupOpen = true
             LockedPlotPopup(stage, font, plot) {
                 activePopupOpen = false
@@ -190,13 +233,11 @@ class HomeScreen(
 
         val building = plot.buildingId?.let { buildingsMap[it] }
         if (building != null) {
-            // Show Building Info panel
             activePopupOpen = true
             BuildingInfoPanel(stage, font, building) {
                 activePopupOpen = false
             }
         } else {
-            // Show Build panel
             activePopupOpen = true
             BuildPanel(stage, font, plot) {
                 activePopupOpen = false
@@ -213,6 +254,7 @@ class HomeScreen(
         val fontSmall = BitmapFont()
         fontSmall.data.setScale(1.1f)
         val valueStyle = Label.LabelStyle(fontSmall, Color.WHITE)
+        val ratingStyle = Label.LabelStyle(fontSmall, GameConstants.COLOR_GOLD)
 
         val initialPlayer = GameDataProvider.cachedPlayer.value
         val initialCoins = initialPlayer?.coins?.toString() ?: "1000"
@@ -221,9 +263,15 @@ class HomeScreen(
         val initialLevel = initialPlayer?.playerLevel ?: 1
 
         playerBadge = PlayerBadge(playerLevel = initialLevel, levelStyle = valueStyle)
+        playerBadge.addListener(object : com.badlogic.gdx.scenes.scene2d.utils.ClickListener() {
+            override fun clicked(event: com.badlogic.gdx.scenes.scene2d.InputEvent?, x: Float, y: Float) {
+                screenManager.setScreen(com.example.game.profile.ProfileScreen(game, screenManager))
+            }
+        })
         coinCounter = ResourceCounter("coin", initialCoins, valueStyle)
         gemCounter = ResourceCounter("gem", initialGems, valueStyle)
         energyCounter = ResourceCounter("energy", initialEnergy, valueStyle)
+        ratingLabel = Label("⭐ 100", ratingStyle)
 
         val menuIcon = TextureFactory.createIcon("menu", 36)
         val menuButtonStyle = Label.LabelStyle(font, Color.WHITE)
@@ -237,10 +285,11 @@ class HomeScreen(
             }
         )
 
-        topTable.add(playerBadge).padRight(8f)
-        topTable.add(coinCounter).padRight(6f)
-        topTable.add(gemCounter).padRight(6f)
-        topTable.add(energyCounter).padRight(6f)
+        topTable.add(playerBadge).padRight(6f)
+        topTable.add(coinCounter).padRight(4f)
+        topTable.add(gemCounter).padRight(4f)
+        topTable.add(energyCounter).padRight(4f)
+        topTable.add(ratingLabel).padRight(6f)
         topTable.add(menuButton).size(48f, 48f).expandX().right()
 
         stage.addActor(topTable)
@@ -309,24 +358,46 @@ class HomeScreen(
         val badgeStyle = Label.LabelStyle(badgeFont, Color.WHITE)
 
         val dailyBtn = FeatureButton("gift", "Daily", "", labelStyle, badgeStyle) {
-            screenManager.setScreen(PlaceholderScreen(game, screenManager, "Daily Reward"))
+            screenManager.setScreen(com.example.game.daily.DailyRewardScreen(game, screenManager))
         }
 
-        val missionsBtn = FeatureButton("clipboard", "Missions", "3", labelStyle, badgeStyle) {
-            screenManager.setScreen(PlaceholderScreen(game, screenManager, "Missions"))
+        val missionsBtn = FeatureButton("clipboard", "Missions", "", labelStyle, badgeStyle) {
+            screenManager.setScreen(com.example.game.mission.MissionScreen(game, screenManager, activeTab = "DAILY"))
         }
 
-        val eventsBtn = FeatureButton("events", "Events", "", labelStyle, badgeStyle) {
-            screenManager.setScreen(PlaceholderScreen(game, screenManager, "Events"))
+        val eventsBtn = FeatureButton("events", "Achievements", "", labelStyle, badgeStyle) {
+            screenManager.setScreen(com.example.game.mission.MissionScreen(game, screenManager, activeTab = "ACHIEVEMENTS"))
+        }
+
+        val storageBtn = FeatureButton("inventory", "Storage", "", labelStyle, badgeStyle) {
+            if (!activePopupOpen) {
+                activePopupOpen = true
+                com.example.game.island.ui.StoragePanel(stage, font) {
+                    activePopupOpen = false
+                }
+            }
+        }
+
+        val editBtn = FeatureButton("shop", "Edit Mode", "", labelStyle, badgeStyle) {
+            if (!activePopupOpen) {
+                activePopupOpen = true
+                isEditMode = true
+                EditModePanel(stage, font, onRotateSelected = {}, onRemoveSelected = {}, onDone = {
+                    activePopupOpen = false
+                    isEditMode = false
+                })
+            }
         }
 
         val debugBtn = FeatureButton("menu", "Debug", "", labelStyle, badgeStyle) {
             debugOverlayTable?.let { it.isVisible = !it.isVisible }
         }
 
-        leftTable.add(dailyBtn).size(105f, 50f).padBottom(12f).row()
-        leftTable.add(missionsBtn).size(105f, 50f).padBottom(12f).row()
-        leftTable.add(eventsBtn).size(105f, 50f).padBottom(12f).row()
+        leftTable.add(dailyBtn).size(105f, 50f).padBottom(8f).row()
+        leftTable.add(missionsBtn).size(105f, 50f).padBottom(8f).row()
+        leftTable.add(eventsBtn).size(105f, 50f).padBottom(8f).row()
+        leftTable.add(storageBtn).size(105f, 50f).padBottom(8f).row()
+        leftTable.add(editBtn).size(105f, 50f).padBottom(8f).row()
         leftTable.add(debugBtn).size(105f, 50f)
 
         stage.addActor(leftTable)
@@ -353,7 +424,7 @@ class HomeScreen(
             borderColor = Color(0.2f, 0.45f, 0.75f, 1f),
             labelStyle = mediumStyle,
             onClick = {
-                screenManager.setScreen(PlaceholderScreen(game, screenManager, "Shop"))
+                screenManager.setScreen(com.example.game.shop.ui.ShopScreen(game, screenManager))
             }
         )
 
@@ -374,7 +445,7 @@ class HomeScreen(
             borderColor = Color(0.2f, 0.45f, 0.75f, 1f),
             labelStyle = mediumStyle,
             onClick = {
-                screenManager.setScreen(PlaceholderScreen(game, screenManager, "Inventory"))
+                screenManager.setScreen(com.example.game.shop.ui.InventoryScreen(game, screenManager))
             }
         )
 
@@ -395,16 +466,13 @@ class HomeScreen(
             playerBadge.setLevel(p.playerLevel)
         }
 
-        // Apply camera matrices
         val combinedMatrix = stage.viewport.camera.combined
         batch.projectionMatrix = combinedMatrix
         shapeRenderer.projectionMatrix = combinedMatrix
 
-        // Render Island Environment & Buildings
         islandRenderer.renderBackground(delta, zonesMap)
-        buildingRenderer.renderPlotsAndBuildings(plotsList, buildingsMap)
+        buildingRenderer.renderPlotsAndBuildings(plotsList, buildingsMap, decorationsList)
 
-        // Render UI HUD Stage
         stage.act(delta)
         stage.draw()
     }

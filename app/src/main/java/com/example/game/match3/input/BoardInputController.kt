@@ -13,7 +13,8 @@ class BoardInputController(
     private val getBoardX: () -> Float,
     private val getBoardY: () -> Float,
     private val getTileSize: () -> Float,
-    private val onSwapRequested: (r1: Int, c1: Int, r2: Int, c2: Int) -> Unit
+    private val onSwapRequested: (r1: Int, c1: Int, r2: Int, c2: Int) -> Unit,
+    var tapInterceptor: ((row: Int, col: Int) -> Boolean)? = null
 ) : InputAdapter() {
 
     private var selectedTile: Tile? = null
@@ -107,6 +108,12 @@ class BoardInputController(
     }
 
     private fun handleTileTap(row: Int, col: Int) {
+        val interceptor = tapInterceptor
+        if (interceptor != null && interceptor.invoke(row, col)) {
+            clearSelection()
+            return
+        }
+
         val tappedTile = boardModel.getTile(row, col) ?: return
 
         val sel = selectedTile

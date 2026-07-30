@@ -72,6 +72,13 @@ object ZoneManager {
                 val updatedZone = zone.copy(isUnlocked = true)
                 GameDataProvider.islandRepository.updateZone(updatedZone)
 
+                com.example.core.event.GameEventBus.postEvent(
+                    com.example.core.event.GameEvent(
+                        type = com.example.core.event.GameEventType.LAND_UNLOCKED,
+                        levelId = zone.zoneId
+                    )
+                )
+
                 // Also unlock all plots in this zone automatically
                 val allPlots = GameDataProvider.islandRepository.allPlotsFlow.first()
                 allPlots.filter { it.zoneId == zone.zoneId }.forEach { plot ->

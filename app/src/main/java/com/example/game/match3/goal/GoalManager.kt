@@ -10,9 +10,18 @@ class GoalManager(val goals: List<LevelGoal>) {
         val counts = clearedTiles.groupingBy { it.name }.eachCount()
 
         for (goal in goals) {
+            val wasCompleted = goal.isCompleted
             val amount = counts[goal.goalType] ?: 0
             if (amount > 0) {
                 goal.currentAmount = Math.min(goal.targetAmount, goal.currentAmount + amount)
+                if (!wasCompleted && goal.isCompleted) {
+                    com.example.core.event.GameEventBus.postEvent(
+                        com.example.core.event.GameEvent(
+                            type = com.example.core.event.GameEventType.GOAL_COMPLETED,
+                            itemId = goal.goalType
+                        )
+                    )
+                }
             }
         }
     }
@@ -21,9 +30,18 @@ class GoalManager(val goals: List<LevelGoal>) {
         val counts = destroyedObstacles.groupingBy { it.name }.eachCount()
 
         for (goal in goals) {
+            val wasCompleted = goal.isCompleted
             val amount = counts[goal.goalType] ?: 0
             if (amount > 0) {
                 goal.currentAmount = Math.min(goal.targetAmount, goal.currentAmount + amount)
+                if (!wasCompleted && goal.isCompleted) {
+                    com.example.core.event.GameEventBus.postEvent(
+                        com.example.core.event.GameEvent(
+                            type = com.example.core.event.GameEventType.GOAL_COMPLETED,
+                            itemId = goal.goalType
+                        )
+                    )
+                }
             }
         }
     }

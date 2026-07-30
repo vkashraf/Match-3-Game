@@ -16,6 +16,7 @@ import com.example.core.GameConstants
 import com.example.core.ScreenManager
 import com.example.game.BaseGameScreen
 import com.example.game.IsleMatchGame
+import com.example.game.match3.booster.BoosterController
 import com.example.game.match3.goal.GoalManager
 import com.example.game.match3.hud.Match3Hud
 import com.example.game.match3.input.BoardInputController
@@ -34,7 +35,8 @@ import com.example.utils.TextureFactory
 class Match3Screen(
     game: IsleMatchGame,
     private val screenManager: ScreenManager,
-    val levelId: Int = 1
+    val levelId: Int = 1,
+    val startingBoosters: Set<String> = emptySet()
 ) : BaseGameScreen(game) {
 
     private val camera = OrthographicCamera()
@@ -79,12 +81,38 @@ class Match3Screen(
 
     private lateinit var inputController: BoardInputController
     private lateinit var match3Hud: Match3Hud
+    private lateinit var boosterController: BoosterController
 
     private var activeDialogTable: Table? = null
 
     init {
         // Generate initial 8x8 board without matches
         boardGenerator.generateInitialBoard(boardModel)
+
+        // Apply starting boosters selected in pre-level preview
+        if (startingBoosters.contains("EXTRA_MOVES")) {
+            moveCounter.addMoves(5)
+        }
+        if (startingBoosters.contains("BOMB_START")) {
+            val r = kotlin.random.Random.nextInt(2, 6)
+            val c = kotlin.random.Random.nextInt(2, 6)
+            boardModel.getTile(r, c)?.specialType = com.example.game.match3.special.SpecialType.BOMB
+        }
+        if (startingBoosters.contains("ROCKET_START")) {
+            val r = kotlin.random.Random.nextInt(2, 6)
+            val c = kotlin.random.Random.nextInt(2, 6)
+            boardModel.getTile(r, c)?.specialType = if (kotlin.random.Random.nextBoolean())
+                com.example.game.match3.special.SpecialType.ROCKET_HORIZONTAL
+            else
+                com.example.game.match3.special.SpecialType.ROCKET_VERTICAL
+        }
+        if (startingBoosters.contains("RAINBOW_START") || startingBoosters.contains("COLOR_BOMB")) {
+            val r = kotlin.random.Random.nextInt(2, 6)
+            val c = kotlin.random.Random.nextInt(2, 6)
+            boardModel.getTile(r, c)?.specialType = com.example.game.match3.special.SpecialType.RAINBOW
+        }
+
+        boosterController = BoosterController(boardModel, matchResolver, levelController)
 
         // Setup input controller
         inputController = BoardInputController(
@@ -100,6 +128,20 @@ class Match3Screen(
             }
         )
 
+        inputController.tapInterceptor = { row, col ->
+            if (boosterController.currentState != com.example.game.match3.booster.BoosterState.NONE) {
+                boosterController.handleTileTap(
+                    row = row,
+                    col = col,
+                    onSuccess = { msg -> match3Hud.showBanner(msg, 2.0f) },
+                    onError = { msg -> match3Hud.showBanner(msg, 2.0f) }
+                )
+                true
+            } else {
+                false
+            }
+        }
+
         val multiplexer = InputMultiplexer()
         multiplexer.addProcessor(stage)
         multiplexer.addProcessor(inputController)
@@ -111,6 +153,13 @@ class Match3Screen(
             moveCounter = moveCounter,
             scoreManager = scoreManager,
             goals = goals,
+            onBoosterClick = { booster ->
+                boosterController.selectBooster(
+                    booster = booster,
+                    onSuccess = { msg -> match3Hud.showBanner(msg, 2.5f) },
+                    onError = { msg -> match3Hud.showBanner(msg, 2.0f) }
+                )
+            },
             onSettingsClick = { showPauseDialog() }
         )
 

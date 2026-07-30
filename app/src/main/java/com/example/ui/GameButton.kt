@@ -20,6 +20,8 @@ class GameButton(
     val onClick: () -> Unit
 ) : Table() {
 
+    private var buttonLabel: Label? = null
+
     init {
         val backgroundDrawable = TextureFactory.createRoundedPanel(
             width = 160,
@@ -36,10 +38,9 @@ class GameButton(
             add(iconImage).size(36f).padRight(8f)
         }
 
-        if (text.isNotEmpty()) {
-            val label = Label(text, labelStyle)
-            add(label)
-        }
+        val label = Label(text, labelStyle)
+        buttonLabel = label
+        add(label)
 
         setTransform(true)
         setOrigin(width / 2f, height / 2f)
@@ -57,5 +58,9 @@ class GameButton(
                 )
             }
         })
+    }
+
+    fun setText(newText: String) {
+        buttonLabel?.setText(newText)
     }
 }

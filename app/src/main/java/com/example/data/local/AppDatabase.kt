@@ -5,23 +5,38 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.sqlite.db.SupportSQLiteDatabase
+import com.example.data.local.dao.AchievementDao
 import com.example.data.local.dao.BuildingDao
 import com.example.data.local.dao.BuildingPlotDao
+import com.example.data.local.dao.DailyRewardDao
 import com.example.data.local.dao.InventoryDao
 import com.example.data.local.dao.IslandZoneDao
 import com.example.data.local.dao.LevelProgressDao
+import com.example.data.local.dao.MissionDao
 import com.example.data.local.dao.PlayerDao
+import com.example.data.local.dao.PlayerStatsDao
 import com.example.data.local.dao.SettingsDao
+import com.example.data.local.entity.AchievementProgressEntity
 import com.example.data.local.entity.BuildingEntity
 import com.example.data.local.entity.BuildingPlotEntity
+import com.example.data.local.entity.DailyRewardStateEntity
 import com.example.data.local.entity.InventoryItemEntity
 import com.example.data.local.entity.IslandZoneEntity
 import com.example.data.local.entity.LevelProgressEntity
+import com.example.data.local.entity.MissionProgressEntity
 import com.example.data.local.entity.PlayerEntity
+import com.example.data.local.entity.PlayerStatsEntity
 import com.example.data.local.entity.SettingsEntity
+import com.example.data.local.dao.WorldProgressDao
+import com.example.data.local.entity.WorldProgressEntity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+
+import com.example.data.local.dao.DecorationDao
+import com.example.data.local.entity.DecorationEntity
+import com.example.data.local.dao.PendingRewardDao
+import com.example.data.local.entity.PendingRewardEntity
 
 @Database(
     entities = [
@@ -31,20 +46,34 @@ import kotlinx.coroutines.launch
         BuildingPlotEntity::class,
         IslandZoneEntity::class,
         InventoryItemEntity::class,
-        SettingsEntity::class
+        SettingsEntity::class,
+        DailyRewardStateEntity::class,
+        MissionProgressEntity::class,
+        AchievementProgressEntity::class,
+        PlayerStatsEntity::class,
+        WorldProgressEntity::class,
+        PendingRewardEntity::class,
+        DecorationEntity::class
     ],
-    version = 2,
+    version = 6,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
 
     abstract fun playerDao(): PlayerDao
     abstract fun levelProgressDao(): LevelProgressDao
+    abstract fun worldProgressDao(): WorldProgressDao
     abstract fun buildingDao(): BuildingDao
     abstract fun buildingPlotDao(): BuildingPlotDao
     abstract fun islandZoneDao(): IslandZoneDao
     abstract fun inventoryDao(): InventoryDao
     abstract fun settingsDao(): SettingsDao
+    abstract fun dailyRewardDao(): DailyRewardDao
+    abstract fun missionDao(): MissionDao
+    abstract fun achievementDao(): AchievementDao
+    abstract fun playerStatsDao(): PlayerStatsDao
+    abstract fun pendingRewardDao(): PendingRewardDao
+    abstract fun decorationDao(): DecorationDao
 
     companion object {
         @Volatile
@@ -92,10 +121,11 @@ abstract class AppDatabase : RoomDatabase() {
                 )
             }
 
-            // Initial Levels (1-100)
-            if (db.levelProgressDao().getLevelCount() == 0) {
+            // Initial Levels (1-200)
+            val currentCount = db.levelProgressDao().getLevelCount()
+            if (currentCount < 200) {
                 val levels = mutableListOf<LevelProgressEntity>()
-                for (i in 1..100) {
+                for (i in (currentCount + 1)..200) {
                     levels.add(
                         LevelProgressEntity(
                             levelId = i,
@@ -110,7 +140,22 @@ abstract class AppDatabase : RoomDatabase() {
                 db.levelProgressDao().insertLevels(levels)
             }
 
-            // Initial Zones
+            // Initial World Progress (1-10)
+            if (db.worldProgressDao().getWorldCount() == 0) {
+                val worlds = mutableListOf<WorldProgressEntity>()
+                for (i in 1..10) {
+                    worlds.add(
+                        WorldProgressEntity(
+                            worldId = i,
+                            isUnlocked = (i == 1),
+                            isCompleted = false,
+                            rewardClaimed = false,
+                            unlockedAt = if (i == 1) System.currentTimeMillis() else 0
+                        )
+                    )
+                }
+                db.worldProgressDao().insertWorlds(worlds)
+            }
             if (db.islandZoneDao().getZoneCount() == 0) {
                 val zones = listOf(
                     IslandZoneEntity(1, "Starter Village", isUnlocked = true, requiredPlayerLevel = 1, requiredStars = 0, requiredCompletedLevel = 1, unlockCostCoins = 0),
@@ -150,6 +195,14 @@ abstract class AppDatabase : RoomDatabase() {
             // Initial Settings
             if (db.settingsDao().getSettings() == null) {
                 db.settingsDao().insertSettings(SettingsEntity())
+            }
+
+            // Initial Inventory Boosters
+            if (db.inventoryDao().getItem("HAMMER") == null) {
+                db.inventoryDao().insertItem(InventoryItemEntity("HAMMER", "BOOSTER", 3))
+                db.inventoryDao().insertItem(InventoryItemEntity("SWAP", "BOOSTER", 2))
+                db.inventoryDao().insertItem(InventoryItemEntity("SHUFFLE", "BOOSTER", 1))
+                db.inventoryDao().insertItem(InventoryItemEntity("EXTRA_MOVES", "BOOSTER", 1))
             }
         }
     }

@@ -1,0 +1,15 @@
+package com.example.game.economy
+
+enum class TransactionSource {
+    LEVEL_REWARD,
+    WORLD_REWARD,
+    BUILDING_UPGRADE,
+    BUILDING_CONSTRUCTION,
+    SHOP_PURCHASE,
+    DAILY_REWARD,
+    MISSION_REWARD,
+    ACHIEVEMENT_REWARD,
+    BOOSTER_USE,
+    RESOURCE_EXCHANGE,
+    SYSTEM
+}
